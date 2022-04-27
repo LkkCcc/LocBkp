@@ -19,7 +19,17 @@ import json
 import os
 from stat import *
 from locbkp.utils.dictionary import DESTINATION_DIRECTORY, BACKUP_LIST, TYPE_DIRECTORY, TYPE_FILE
-from locbkp.utils.logger import get_logger
+import logging
+import sys
+_format = "%(asctime)s - [%(levelname)-7s] - {}: %(filename)32s:%(lineno)-3s | %(message)s"
+default_format = _format.format("LocBkp")
+
+loggers = {}
+
+default_logpath = "LocBkp.log"
+default_logger = None
+
+default_level = logging.INFO
 progress_bar_resolution_pct = {
     1: 100,
     2: 50,
@@ -31,6 +41,56 @@ progress_bar_resolution_pct = {
 }
 
 wont_backup = []
+
+
+def get_stream_handlers(logpath, level=logging.INFO, format=default_format):
+    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(logging.Formatter(format))
+
+    stream_handler_file = logging.FileHandler(logpath, encoding='utf-8')
+    stream_handler_file.setLevel(level)
+    stream_handler_file.setFormatter(logging.Formatter(format))
+
+    return stream_handler, stream_handler_file
+
+
+def get_logger(name="LocBkp", level=None, logpath=None):
+    global default_logger
+    if default_logger is not None:
+        return default_logger
+    global default_level
+    if logpath is None:
+        logpath = default_logpath
+    if level is None:
+        level = default_level
+    if name in loggers:
+        if loggers[name].level == level:
+            return loggers[name]
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.handlers = []
+    for ahandler in get_stream_handlers(logpath, level, format=_format.format(name)):
+        logger.addHandler(ahandler)
+    loggers[name] = logger
+    return loggers[name]
+
+
+def setdebug():
+    global default_level
+    get_logger().info("Enabling debug logging")
+    default_level = logging.DEBUG
+    get_logger().debug("Debug logging enabled")
+
+
+def set_default_logger(alogger):
+    global default_logger
+    default_logger = alogger
+
+
+def getdebug():
+    return default_level == logging.DEBUG
+
 
 logger = get_logger()
 
@@ -115,17 +175,17 @@ def get_tree(apath, get_dirs=True):
 def validate_config(config):
     if DESTINATION_DIRECTORY not in config:
         logger.error("Destination directory is not specified in backup list. Cannot proceed, exiting...")
-        exit(1)
+        return False
     if not os.path.exists(DESTINATION_DIRECTORY):
         try:
             os.makedirs(DESTINATION_DIRECTORY)
         except BaseException as e:
             logger.error("Destination directory {} does not exist and cannot be created due to {}.\n"
                          "Cannot proceed, exiting...".format(DESTINATION_DIRECTORY, e.__class__.__name__))
-            exit(1)
+            return False
     if BACKUP_LIST not in config:
         logger.error("No backup filelist in backup list file. Cannot proceed, exiting...")
-        exit(1)
+        return False
     if len(config[BACKUP_LIST]) == 0:
         logger.warning("Backup filelist is empty. Will not backup anything!")
     newbkplist = []
@@ -158,5 +218,6 @@ def get_config(cfg_path):
             backup_list = json.load(conf_file)
     else:
         logger.error("Backup list \"{}\" does not exist. Cannot continue.")
-        exit(1)
+        return False
     return validate_config(backup_list)
+
