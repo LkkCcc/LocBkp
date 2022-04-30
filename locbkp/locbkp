@@ -19,12 +19,18 @@
 import argparse
 
 from locbkp.Backup import Backup
+from locbkp.utils.utils import get_logger
 
+logger = get_logger()
 parser = argparse.ArgumentParser()
 parser.add_argument("--configs", help="Backup lists to use.", type=str)
 args = parser.parse_args()
 
-backup_lists = args.configs.split(" ")
+if args.configs is not None:
+    backup_lists = args.configs.split(" ")
+else:
+    logger.info("No configs provided. Cannot start.")
+    exit(1)
 
 for alist in backup_lists:
     backup = Backup(alist)
