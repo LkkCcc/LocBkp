@@ -27,14 +27,14 @@ from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar
 if os.name == "nt":
     p7z_path = "C:\\Program Files\\7-Zip\\7z.exe"
 else:
-    p7z_path = "7z"
+    p7z_path = "/usr/bin/7z"
 
 
 class Backup:
     def __init__(self, backup_list_path):
-        self.version = "0.0.4"
+        self.version = "0.0.4i"
         self.backup_list_path = backup_list_path
-        self.backup_list_name = os.path.join(*os.path.basename(backup_list_path).split(".")[:-1])
+        self.backup_list_name = sanitize_path(*os.path.basename(backup_list_path).split(".")[:-1])
         self.time_start = datetime.now()
         self.time_preparation = timedelta(seconds=0)
         self.time_preparation_finished = self.time_start
@@ -52,15 +52,15 @@ class Backup:
         self.size_after_compression = 0.0
         self.curdate = self.time_start.strftime("%d-%m-%Y_%H.%M.%S")
         self.temp = tempfile.gettempdir()
-        self.packing_directory = os.path.join(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
+        self.packing_directory = sanitize_path(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
         self.logger = get_logger()
         try:
             os.makedirs(self.packing_directory)
         except BaseException as e:
             self.logger.error("Could not create temp directory: {}. Cannot proceed.".format(e.__class__.__name__))
-        self.logfile = os.path.join(self.temp, "LocBkp_{}_{}.log".format(self.backup_list_name, self.curdate))
+        self.logfile = sanitize_path(self.temp, "LocBkp_{}_{}.log".format(self.backup_list_name, self.curdate))
         self.archive_name = "backup_{}.7z".format(self.curdate)
-        self.archive_path = os.path.join(self.temp, self.archive_name)
+        self.archive_path = sanitize_path(self.temp, self.archive_name)
         self.logger = get_logger(name="LocBkp({})".format(self.backup_list_name), logpath=self.logfile)
         self.logger.info("LocBkp v.{} Backup instance initialized.".format(self.version))
         self.backup_list = get_config(backup_list_path)
@@ -102,7 +102,7 @@ class Backup:
 
     def generate_backup_report(self, backup_size):
         try:
-            with open(os.path.join(self.packing_directory, "LocBkp_report_{}.json".format(self.curdate)),
+            with open(sanitize_path(self.packing_directory, "LocBkp_report_{}.json".format(self.curdate)),
                       "w") as locbkp_report:
                 json.dump(
                     {
@@ -142,8 +142,6 @@ class Backup:
         self.logger.info("Generating backup report...")
         self.generate_backup_report(self.size_before_compression)
         self.logger.info("Compressing backup...")
-        # logger.info("Executing: {}".format(" ".join(p7z_cmd)))
-        self.copy_log()
         time_pre_compress = datetime.now()
         self.compress_backup()
         self.time_compress_finished = datetime.now()
@@ -159,25 +157,19 @@ class Backup:
         self.time_cleanup_finished = datetime.now()
         self.time_cleanup = self.time_cleanup_finished - self.time_transfer_finished
 
-    def copy_log(self):
-        self.logger.info("Copying log file...")
-        try:
-            shutil.copy(self.logfile, self.packing_directory)
-        except BaseException as e:
-            self.logger.error("Could not copy log file: {}".format(e.__class__.__name__))
-
     def compress_backup(self):
         p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx9", "-aoa", self.packing_directory]
+        self.logger.info("Executing: {}".format(" ".join(p7z_cmd)))
         try:
-            process = subprocess.Popen(p7z_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-            process.wait()
+            process = subprocess.run(p7z_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, check=True)
         except BaseException as e:
             self.logger.error("Could not compress backup: {}".format(e.__class__.__name__))
+            self.logger.error("Process stdout: {}".format(process.stdout))
 
     def transfer_file(self, path_to):
         self.logger.info("Transferring backup to destination location...")
         time_pre_transfer = datetime.now()
-        destfile = os.path.join(path_to, self.archive_name)
+        destfile = sanitize_path(path_to, self.archive_name)
         try:
             shutil.copy(self.archive_path, destfile)
         except BaseException as e:
@@ -186,9 +178,12 @@ class Backup:
         self.time_transfer = self.time_transfer_finished - time_pre_transfer
 
     def backup_file(self, file_path):
-        destination = os.path.join(self.packing_directory, file_path)
+        destination = sanitize_path(self.packing_directory, file_path)
         # logger.info("Backing up {} to {}".format(file_path, destination))
-        shutil.copy(file_path, destination)
+        try:
+            shutil.copy(file_path, destination)
+        except BaseException as e:
+            self.logger.warning("Could not copy {} to {}: {}".format(file_path, destination, e.__class__.__name__))
         return True
 
     def start(self):

@@ -17,6 +17,7 @@
 
 import json
 import os
+import tempfile
 from stat import *
 from locbkp.utils.dictionary import DESTINATION_DIRECTORY, BACKUP_LIST, TYPE_DIRECTORY, TYPE_FILE
 import logging
@@ -26,7 +27,7 @@ default_format = _format.format("LocBkp")
 
 loggers = {}
 
-default_logpath = "LocBkp.log"
+default_logpath = os.path.join(tempfile.gettempdir(), "LocBkp.log")
 default_logger = None
 
 default_level = logging.INFO
@@ -176,12 +177,12 @@ def validate_config(config):
     if DESTINATION_DIRECTORY not in config:
         logger.error("Destination directory is not specified in backup list. Cannot proceed, exiting...")
         return False
-    if not os.path.exists(DESTINATION_DIRECTORY):
+    if not os.path.exists(config[DESTINATION_DIRECTORY]):
         try:
-            os.makedirs(DESTINATION_DIRECTORY)
+            os.makedirs(config[DESTINATION_DIRECTORY])
         except BaseException as e:
             logger.error("Destination directory {} does not exist and cannot be created due to {}.\n"
-                         "Cannot proceed, exiting...".format(DESTINATION_DIRECTORY, e.__class__.__name__))
+                         "Cannot proceed, exiting...".format(config[DESTINATION_DIRECTORY], e.__class__.__name__))
             return False
     if BACKUP_LIST not in config:
         logger.error("No backup filelist in backup list file. Cannot proceed, exiting...")
@@ -200,7 +201,6 @@ def validate_config(config):
 
 
 def sanitize_path(*apath):
-    logger.info("INPUT: {}".format(apath))
     apath = list(apath)
     if os.name == 'nt':
         for num, anode in enumerate(apath):
@@ -214,12 +214,8 @@ def sanitize_path(*apath):
             if num == 0:
                 continue
             if anode.startswith("/"):
-                logger.info("{} STARTS WITH SLASH".format(anode))
                 apath[num] = str(anode[1:])
-            logger.info("{} DOES NOT START WITH SLASH".format(anode))
-        logger.info("PRE RESULT: {}".format(apath))
         respath = os.path.join(*apath)
-        logger.info("RESULT: {}".format(respath))
     return respath
 
 
