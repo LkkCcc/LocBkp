@@ -200,6 +200,7 @@ def validate_config(config):
 
 
 def sanitize_path(*apath):
+    logger.info("INPUT: {}".format(apath))
     apath = list(apath)
     if os.name == 'nt':
         for num, anode in enumerate(apath):
@@ -207,7 +208,18 @@ def sanitize_path(*apath):
                 continue
             if ":" in anode:
                 apath[num] = anode.replace(":", "")
-    respath = os.path.join(*apath)
+        respath = os.path.join(*apath)
+    else:
+        for num, anode in enumerate(apath):
+            if num == 0:
+                continue
+            if anode.startswith("/"):
+                logger.info("{} STARTS WITH SLASH".format(anode))
+                apath[num] = str(anode[1:])
+            logger.info("{} DOES NOT START WITH SLASH".format(anode))
+        logger.info("PRE RESULT: {}".format(apath))
+        respath = os.path.join(*apath)
+        logger.info("RESULT: {}".format(respath))
     return respath
 
 
@@ -217,7 +229,7 @@ def get_config(cfg_path):
         with open(cfg_path, "r") as conf_file:
             backup_list = json.load(conf_file)
     else:
-        logger.error("Backup list \"{}\" does not exist. Cannot continue.")
+        logger.error("Backup list \"{}\" does not exist. Cannot continue.".format(cfg_path))
         return False
     return validate_config(backup_list)
 

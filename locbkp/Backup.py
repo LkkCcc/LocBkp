@@ -32,7 +32,7 @@ else:
 
 class Backup:
     def __init__(self, backup_list_path):
-        self.version = "0.0.1"
+        self.version = "0.0.4"
         self.backup_list_path = backup_list_path
         self.backup_list_name = os.path.join(*os.path.basename(backup_list_path).split(".")[:-1])
         self.time_start = datetime.now()
@@ -186,7 +186,7 @@ class Backup:
         self.time_transfer = self.time_transfer_finished - time_pre_transfer
 
     def backup_file(self, file_path):
-        destination = sanitize_path(self.packing_directory, file_path)
+        destination = os.path.join(self.packing_directory, file_path)
         # logger.info("Backing up {} to {}".format(file_path, destination))
         shutil.copy(file_path, destination)
         return True
