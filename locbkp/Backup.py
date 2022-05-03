@@ -32,7 +32,7 @@ else:
 
 class Backup:
     def __init__(self, backup_list_path):
-        self.version = "0.0.4i"
+        self.version = "0.0.4j"
         self.backup_list_path = backup_list_path
         self.backup_list_name = sanitize_path(*os.path.basename(backup_list_path).split(".")[:-1])
         self.time_start = datetime.now()
@@ -110,7 +110,8 @@ class Backup:
                         "dirs_backed": self.dirs_backed,
                         "size_uncompressed_mb": backup_size
                     },
-                    locbkp_report
+                    locbkp_report,
+                    indent=4
                 )
         except BaseException as e:
             self.logger.error("Could not create backup report! Error: {}".format(e.__class__.__name__))
