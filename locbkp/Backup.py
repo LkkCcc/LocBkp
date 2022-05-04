@@ -32,7 +32,7 @@ else:
 
 class Backup:
     def __init__(self, backup_list_path):
-        self.version = "0.0.4j"
+        self.version = "0.0.4k"
         self.backup_list_path = backup_list_path
         self.backup_list_name = sanitize_path(*os.path.basename(backup_list_path).split(".")[:-1])
         self.time_start = datetime.now()
@@ -134,7 +134,7 @@ class Backup:
             progress_bar(num, total_files)
             if os.path.exists(afile) and os.path.isfile(afile):
                 if self.backup_file(afile):
-                    self.files_backed.append(sanitize_path(afile, self.packing_directory))
+                    self.files_backed.append(afile)
 
     def backup_finalize(self, destdir):
         self.logger.info("Backup finished. Finalizing...")
