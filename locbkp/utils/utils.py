@@ -56,16 +56,17 @@ def get_stream_handlers(logpath, level=logging.INFO, format=default_format):
     return stream_handler, stream_handler_file
 
 
-def get_logger(name="LocBkp", level=None, logpath=None):
-    global default_logger
-    if default_logger is not None:
-        return default_logger
+def get_logger(name="LocBkp", level=None, logpath=None, redefine_default=False):
+    if not redefine_default:
+        global default_logger
+        if default_logger is not None:
+            return default_logger
     global default_level
     if logpath is None:
         logpath = default_logpath
     if level is None:
         level = default_level
-    if name in loggers:
+    if name in loggers and not redefine_default:
         if loggers[name].level == level:
             return loggers[name]
     logger = logging.getLogger(name)
@@ -74,6 +75,8 @@ def get_logger(name="LocBkp", level=None, logpath=None):
     for ahandler in get_stream_handlers(logpath, level, format=_format.format(name)):
         logger.addHandler(ahandler)
     loggers[name] = logger
+    if redefine_default:
+        set_default_logger(loggers[name])
     return loggers[name]
 
 

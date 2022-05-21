@@ -23,7 +23,8 @@ import os
 from locbkp.utils.dictionary import BACKUP_LIST, DESTINATION_DIRECTORY, BACKUP_NAME, DATE_FORMAT, \
     BACKUP_FILENAME_TEMPLATE, RETENTION
 
-from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, get_logger, files
+from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, files
+from __main__ import logger, version
 
 if os.name == "nt":
     p7z_path = "C:\\Program Files\\7-Zip\\7z.exe"
@@ -33,7 +34,8 @@ else:
 
 class Backup:
     def __init__(self, backup_list_path):
-        self.version = "0.0.4k"
+        self.logger = logger
+        self.version = version
         self.backup_list_path = backup_list_path
         self.backup_list_name = sanitize_path(*os.path.basename(backup_list_path).split(".")[:-1])
         self.time_start = datetime.now()
@@ -54,14 +56,10 @@ class Backup:
         self.curdate = self.time_start.strftime(DATE_FORMAT)
         self.temp = tempfile.gettempdir()
         self.packing_directory = sanitize_path(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
-        self.logger = get_logger()
         try:
             os.makedirs(self.packing_directory)
         except BaseException as e:
             self.logger.error("Could not create temp directory: {}. Cannot proceed.".format(e.__class__.__name__))
-        self.logfile = sanitize_path(self.temp, "LocBkp_{}_{}.log".format(self.backup_list_name, self.curdate))
-        self.logger = get_logger(name="LocBkp({})".format(self.backup_list_name), logpath=self.logfile)
-        self.logger.info("LocBkp v.{} Backup instance initialized.".format(self.version))
         self.backup_list = get_config(backup_list_path)
         self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
         self.archive_path = sanitize_path(self.temp, self.archive_name)
@@ -107,6 +105,7 @@ class Backup:
                       "w") as locbkp_report:
                 json.dump(
                     {
+                        "locbkp_version": self.version,
                         "files_backed": self.files_backed,
                         "dirs_backed": self.dirs_backed,
                         "size_uncompressed_mb": backup_size
@@ -148,8 +147,8 @@ class Backup:
         self.compress_backup()
         self.time_compress_finished = datetime.now()
         self.time_compress = self.time_compress_finished - time_pre_compress
-        size_after_compression = os.path.getsize(self.archive_path) / 1024 / 1024
-        self.logger.info("Backup is compressed. Compressed size is {:.3f}Mb".format(size_after_compression))
+        self.size_after_compression = os.path.getsize(self.archive_path) / 1024 / 1024
+        self.logger.info("Backup is compressed. Compressed size is {:.3f}Mb".format(self.size_after_compression))
         self.transfer_file(destdir)
         self.logger.info("Done. Cleaning up...")
         os.remove(self.archive_path)
@@ -229,4 +228,4 @@ class Backup:
         self.logger.info("Total time is {:.3f}s.".format(total_time.total_seconds()))
         self.logger.info("Done backing up. Working on retention...")
         self.handle_retention()
-        self.logger.info("Done.")
+        self.logger.info("=== LocBkp finished ===")

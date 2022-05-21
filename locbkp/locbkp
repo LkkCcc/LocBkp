@@ -17,11 +17,30 @@
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import argparse
+import os
+
+import logging
+
+from locbkp.utils.utils import get_logger, set_default_logger
+
+version = "0.0.5a"
+
+if os.name == "nt":
+    logdir = "./logs"
+else:
+    logdir = "/var/log/services/LocBkp/"
+
+log_path = os.path.join(logdir, "Locbkp.log")
+
+if not os.path.exists(logdir):
+    os.makedirs(logdir)
+
+logger = get_logger(level=logging.INFO, logpath=log_path, redefine_default=True)
 
 from locbkp.Backup import Backup
-from locbkp.utils.utils import get_logger
 
-logger = get_logger()
+logger.info("=== LocBkp v.{} started ===".format(version))
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--configs", help="Backup lists to use.", type=str)
 args = parser.parse_args()
