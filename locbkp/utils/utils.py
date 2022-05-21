@@ -229,3 +229,8 @@ def get_config(cfg_path):
         return False
     return validate_config(backup_list)
 
+
+def files(path):
+    for afile in os.listdir(path):
+        if os.path.isfile(os.path.join(path, afile)):
+            yield afile

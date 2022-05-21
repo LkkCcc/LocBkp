@@ -20,9 +20,10 @@ from datetime import datetime, timedelta
 import tempfile
 import os
 
-from locbkp.utils.dictionary import BACKUP_LIST, DESTINATION_DIRECTORY
+from locbkp.utils.dictionary import BACKUP_LIST, DESTINATION_DIRECTORY, BACKUP_NAME, DATE_FORMAT, \
+    BACKUP_FILENAME_TEMPLATE, RETENTION
 
-from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, get_logger
+from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, get_logger, files
 
 if os.name == "nt":
     p7z_path = "C:\\Program Files\\7-Zip\\7z.exe"
@@ -50,7 +51,7 @@ class Backup:
         self.dirs_backed = []
         self.size_before_compression = 0.0
         self.size_after_compression = 0.0
-        self.curdate = self.time_start.strftime("%d-%m-%Y_%H.%M.%S")
+        self.curdate = self.time_start.strftime(DATE_FORMAT)
         self.temp = tempfile.gettempdir()
         self.packing_directory = sanitize_path(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
         self.logger = get_logger()
@@ -59,11 +60,11 @@ class Backup:
         except BaseException as e:
             self.logger.error("Could not create temp directory: {}. Cannot proceed.".format(e.__class__.__name__))
         self.logfile = sanitize_path(self.temp, "LocBkp_{}_{}.log".format(self.backup_list_name, self.curdate))
-        self.archive_name = "backup_{}.7z".format(self.curdate)
-        self.archive_path = sanitize_path(self.temp, self.archive_name)
         self.logger = get_logger(name="LocBkp({})".format(self.backup_list_name), logpath=self.logfile)
         self.logger.info("LocBkp v.{} Backup instance initialized.".format(self.version))
         self.backup_list = get_config(backup_list_path)
+        self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
+        self.archive_path = sanitize_path(self.temp, self.archive_name)
 
     def prepare_backup_lists(self, backup_list):
         files_to_bkp = []
@@ -153,7 +154,6 @@ class Backup:
         self.logger.info("Done. Cleaning up...")
         os.remove(self.archive_path)
         shutil.rmtree(self.packing_directory)
-        os.remove(self.logfile)
         self.logger.info("Cleaned up.")
         self.time_cleanup_finished = datetime.now()
         self.time_cleanup = self.time_cleanup_finished - self.time_transfer_finished
@@ -187,6 +187,34 @@ class Backup:
             self.logger.warning("Could not copy {} to {}: {}".format(file_path, destination, e.__class__.__name__))
         return True
 
+    def handle_retention(self):
+        destdir = self.backup_list[DESTINATION_DIRECTORY]
+        filesindir = files(destdir)
+        retention = self.backup_list[RETENTION]
+        backup_files = []
+        backups_to_remove = []
+        for afile in filesindir:
+            try:
+                if afile.startswith(self.backup_list[BACKUP_NAME]):
+                    backup_date = datetime.strptime(afile[len(self.backup_list[BACKUP_NAME])+1:-3], DATE_FORMAT)
+                    backup_files.append((afile, backup_date))
+            except Exception as e:
+                continue
+        backup_files_quan = len(backup_files)
+        self.logger.info("There is {} backup files in destination directory. Retention is set to {}."
+                         .format(backup_files_quan, retention))
+        if backup_files_quan > retention:
+            backups_to_remove_quan = backup_files_quan - retention
+            self.logger.info("Will remove {} old backups.".format(backups_to_remove_quan))
+            backup_files.sort(key=lambda x: x[1])
+            backups_to_remove = backup_files[:backups_to_remove_quan]
+        else:
+            self.logger.info("Nothing to delete.")
+            return
+        for afile in backups_to_remove:
+            self.logger.info("Removing {}...".format(afile[0]))
+            os.remove(os.path.join(destdir, afile[0]))
+
     def start(self):
         self.start_backup()
         total_time = datetime.now() - self.time_start
@@ -199,4 +227,6 @@ class Backup:
         self.logger.info("Compression effectiveness is {:.2f}%".format(
             100 - (self.size_after_compression / self.size_before_compression) * 100))
         self.logger.info("Total time is {:.3f}s.".format(total_time.total_seconds()))
+        self.logger.info("Done backing up. Working on retention...")
+        self.handle_retention()
         self.logger.info("Done.")
