@@ -61,6 +61,9 @@ class Backup:
         except BaseException as e:
             self.logger.error("Could not create temp directory: {}. Cannot proceed.".format(e.__class__.__name__))
         self.backup_list = get_config(backup_list_path)
+        if not self.backup_list:
+            logger.error("Could not load backup list by path: {}".format(self.backup_list_path))
+            exit(1)
         self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
         self.archive_path = sanitize_path(self.temp, self.archive_name)
 
