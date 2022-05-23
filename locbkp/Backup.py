@@ -229,3 +229,4 @@ class Backup:
         self.logger.info("Done backing up. Working on retention...")
         self.handle_retention()
         self.logger.info("=== LocBkp finished ===")
+        print(self.archive_name)

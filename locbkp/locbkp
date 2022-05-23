@@ -23,7 +23,7 @@ import logging
 
 from locbkp.utils.utils import get_logger, set_default_logger
 
-version = "0.0.5a"
+version = "0.0.5b"
 
 if os.name == "nt":
     logdir = "./logs"
@@ -54,6 +54,6 @@ else:
 for alist in backup_lists:
     backup = Backup(alist)
     if backup.backup_list:
-        backup.start()
+        backup_result_file = backup.start()
 
 
