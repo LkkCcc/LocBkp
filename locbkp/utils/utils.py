@@ -125,7 +125,10 @@ def progress_bar(current, total):
     cur_progress = current / total * 100
     progress_one_percent = total / 100
     resolution = get_progress_bar_resolution(total)
-    if current % int(progress_one_percent * resolution) == 0:
+    resolution_pct = int(progress_one_percent * resolution)
+    if resolution_pct == 0:
+        return
+    if current % resolution_pct  == 0:
         logger.info("{}%".format(closest_divisible(int(cur_progress), resolution)))
     return cur_progress
 

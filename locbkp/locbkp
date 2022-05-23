@@ -23,7 +23,7 @@ import logging
 
 from locbkp.utils.utils import get_logger, set_default_logger
 
-version = "0.0.5b"
+version = "0.0.5c"
 
 if os.name == "nt":
     logdir = "./logs"
