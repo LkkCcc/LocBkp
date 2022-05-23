@@ -21,7 +21,7 @@ import tempfile
 import os
 
 from locbkp.utils.dictionary import BACKUP_LIST, DESTINATION_DIRECTORY, BACKUP_NAME, DATE_FORMAT, \
-    BACKUP_FILENAME_TEMPLATE, RETENTION
+    BACKUP_FILENAME_TEMPLATE, RETENTION, CREATE_SUBDIR
 
 from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, files
 from __main__ import logger, version
@@ -64,6 +64,7 @@ class Backup:
         if not self.backup_list:
             logger.error("Could not load backup list by path: {}".format(self.backup_list_path))
             exit(1)
+        self.create_subdir = self.backup_list[CREATE_SUBDIR] if CREATE_SUBDIR in self.backup_list else False
         self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
         self.archive_path = sanitize_path(self.temp, self.archive_name)
 
@@ -161,7 +162,10 @@ class Backup:
         self.time_cleanup = self.time_cleanup_finished - self.time_transfer_finished
 
     def compress_backup(self):
-        p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx9", "-aoa", self.packing_directory]
+        if self.create_subdir:
+            p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx9", "-aoa", self.packing_directory]
+        else:
+            p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx9", "-aoa", os.path.join(self.packing_directory, "*")]
         self.logger.info("Executing: {}".format(" ".join(p7z_cmd)))
         try:
             process = subprocess.run(p7z_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, check=True)
