@@ -16,6 +16,7 @@
 import json
 import shutil
 import subprocess
+import tempfile
 from datetime import datetime, timedelta
 import os
 
@@ -32,9 +33,9 @@ else:
     p7z_path = "/usr/bin/7z"
 
 if os.name == "nt":
-    packdir_tmp = "C:\\vir\\locbkp"
+    packing_directories = [tempfile.gettempdir(), "C:\\vir\\locbkp"]
 else:
-    packdir_tmp = "/opt/locbkp_temp"
+    packing_directories = [tempfile.gettempdir(), "/opt/locbkp_temp"]
 
 
 class Backup:
@@ -59,26 +60,34 @@ class Backup:
         self.size_before_compression = 0.0
         self.size_after_compression = 0.0
         self.curdate = self.time_start.strftime(DATE_FORMAT)
-        self.temp = packdir_tmp
-        self.packing_directory = sanitize_path(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
-        try:
-            os.makedirs(self.packing_directory)
-        except BaseException as e:
-            self.logger.error("Could not create temp directory: {}. Cannot proceed.".format(e.__class__.__name__))
         self.backup_list = get_config(backup_list_path)
+        self.temp = self.decide_packing_directory()
+        if self.temp is None:
+            logger.error("No suitable directories for temporary storage. Cannot proceed.")
+            exit(1)
+        self.packing_directory = sanitize_path(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
         if not self.backup_list:
             logger.error("Could not load backup list by path: {}".format(self.backup_list_path))
             exit(1)
         self.create_subdir = self.backup_list[CREATE_SUBDIR] if CREATE_SUBDIR in self.backup_list else False
         self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
         self.archive_path = sanitize_path(self.temp, self.archive_name)
-        os.makedirs(packdir_tmp, exist_ok=True)
-        packing_dir_free_space = get_free_space_in_dir(packdir_tmp)
+
+    def decide_packing_directory(self):
+        logger.info("Deciding temporary directory...")
         backup_size = os.path.getsize(self.backup_list[DESTINATION_DIRECTORY])
-        logger.info("Free space in packing dir: {:.2f}G; Backup size is: {:2f}G.".format(packing_dir_free_space/1024/1024/1024, backup_size/1024/1024))
-        if not packing_dir_free_space > backup_size + 1 * 1024 * 1024 * 1024:
-            logger.error("Backup is bigger than packing directory! Will not backup!")
-            exit(1)
+        for packdir in packing_directories:
+            try:
+                os.makedirs(packdir, exist_ok=True)
+            except BaseException as e:
+                self.logger.error("Could not create temp directory: {}.".format(e.__class__.__name__))
+                continue
+            packing_dir_free_space = get_free_space_in_dir(packdir)
+            logger.info("Checking {}: Free space in packing dir: {:.2f}G; Backup size is: {:2f}G."
+                        .format(packdir, packing_dir_free_space/1024/1024/1024, backup_size/1024/1024))
+            if packing_dir_free_space > backup_size * 2 + 1 * 1024 * 1024 * 1024:
+                logger.info("{} seems suitable for packing.".format(packdir))
+                return packdir
 
     def prepare_backup_lists(self, backup_list):
         files_to_bkp = []
@@ -175,9 +184,9 @@ class Backup:
 
     def compress_backup(self):
         if self.create_subdir:
-            p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx9", "-aoa", self.packing_directory]
+            p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx5", "-aoa", self.packing_directory]
         else:
-            p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx9", "-aoa", os.path.join(self.packing_directory, "*")]
+            p7z_cmd = [p7z_path, "a", "-t7z", self.archive_path, "-mx5", "-aoa", os.path.join(self.packing_directory, "*")]
         self.logger.info("Executing: {}".format(" ".join(p7z_cmd)))
         try:
             process = subprocess.run(p7z_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, check=True)
