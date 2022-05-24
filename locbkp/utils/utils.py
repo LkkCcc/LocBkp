@@ -17,6 +17,7 @@
 
 import json
 import os
+import shutil
 import tempfile
 from stat import *
 from locbkp.utils.dictionary import DESTINATION_DIRECTORY, BACKUP_LIST, TYPE_DIRECTORY, TYPE_FILE
@@ -223,6 +224,14 @@ def sanitize_path(*apath):
                 apath[num] = str(anode[1:])
         respath = os.path.join(*apath)
     return respath
+
+
+def get_free_space_in_dir(path):
+    if not os.path.isdir(path):
+        raise OSError(
+            "Can only determine free space associated with directories, "
+            "not files.")
+    return shutil.disk_usage(path).free
 
 
 def get_config(cfg_path):

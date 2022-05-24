@@ -17,19 +17,24 @@ import json
 import shutil
 import subprocess
 from datetime import datetime, timedelta
-import tempfile
 import os
 
 from locbkp.utils.dictionary import BACKUP_LIST, DESTINATION_DIRECTORY, BACKUP_NAME, DATE_FORMAT, \
     BACKUP_FILENAME_TEMPLATE, RETENTION, CREATE_SUBDIR
 
-from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, files
+from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, files, \
+    get_free_space_in_dir
 from __main__ import logger, version
 
 if os.name == "nt":
     p7z_path = "C:\\Program Files\\7-Zip\\7z.exe"
 else:
     p7z_path = "/usr/bin/7z"
+
+if os.name == "nt":
+    packdir_tmp = "C:\\vir\\locbkp"
+else:
+    packdir_tmp = "/opt/locbkp_temp"
 
 
 class Backup:
@@ -54,7 +59,7 @@ class Backup:
         self.size_before_compression = 0.0
         self.size_after_compression = 0.0
         self.curdate = self.time_start.strftime(DATE_FORMAT)
-        self.temp = tempfile.gettempdir()
+        self.temp = packdir_tmp
         self.packing_directory = sanitize_path(self.temp, "{}_{}".format(self.backup_list_name, self.curdate))
         try:
             os.makedirs(self.packing_directory)
@@ -67,6 +72,13 @@ class Backup:
         self.create_subdir = self.backup_list[CREATE_SUBDIR] if CREATE_SUBDIR in self.backup_list else False
         self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
         self.archive_path = sanitize_path(self.temp, self.archive_name)
+        os.makedirs(packdir_tmp, exist_ok=True)
+        packing_dir_free_space = get_free_space_in_dir(packdir_tmp)
+        backup_size = os.path.getsize(self.backup_list[DESTINATION_DIRECTORY])
+        logger.info("Free space in packing dir: {:.2f}G; Backup size is: {:2f}G.".format(packing_dir_free_space/1024/1024/1024, backup_size/1024/1024))
+        if not packing_dir_free_space > backup_size + 1 * 1024 * 1024 * 1024:
+            logger.error("Backup is bigger than packing directory! Will not backup!")
+            exit(1)
 
     def prepare_backup_lists(self, backup_list):
         files_to_bkp = []
