@@ -19,12 +19,13 @@ import subprocess
 import tempfile
 from datetime import datetime, timedelta
 import os
+from os.path import isfile, isdir
 
 from locbkp.utils.dictionary import BACKUP_LIST, DESTINATION_DIRECTORY, BACKUP_NAME, DATE_FORMAT, \
     BACKUP_FILENAME_TEMPLATE, RETENTION, CREATE_SUBDIR
 
 from locbkp.utils.utils import sanitize_path, get_tree, get_config, progress_bar, get_dir_size_mb, files, \
-    get_free_space_in_dir
+    get_free_space_in_dir, get_dir_size
 from __main__ import logger, version
 
 if os.name == "nt":
@@ -61,7 +62,7 @@ class Backup:
         self.size_after_compression = 0.0
         self.curdate = self.time_start.strftime(DATE_FORMAT)
         self.backup_list = get_config(backup_list_path)
-        self.temp = self.decide_packing_directory()
+        self.temp = self.check_size_requirements()
         if self.temp is None:
             logger.error("No suitable directories for temporary storage. Cannot proceed.")
             exit(1)
@@ -73,9 +74,22 @@ class Backup:
         self.archive_name = BACKUP_FILENAME_TEMPLATE.format(self.backup_list[BACKUP_NAME], self.curdate)
         self.archive_path = sanitize_path(self.temp, self.archive_name)
 
-    def decide_packing_directory(self):
+    def check_size_requirements(self):
         logger.info("Deciding temporary directory...")
-        backup_size = os.path.getsize(self.backup_list[DESTINATION_DIRECTORY])
+        backup_size = 0
+        for apath in self.backup_list[BACKUP_LIST]:
+            if os.path.exists(apath):
+                if isfile(apath):
+                    backup_size += os.path.getsize(apath)
+                elif isdir(apath):
+                    backup_size += get_dir_size(apath)
+        destdir = self.backup_list[DESTINATION_DIRECTORY]
+        dest_dir_free_space = get_free_space_in_dir(destdir)
+        if backup_size >= dest_dir_free_space:
+            self.logger.error("Insufficient free space in destination directory: {}."
+                              "Free space: {}G. Backup size: {}G. Will not back up"
+                              .format(destdir, dest_dir_free_space/1024/1024/1024, backup_size/1024/1024/1024))
+            return
         for packdir in packing_directories:
             try:
                 os.makedirs(packdir, exist_ok=True)
@@ -84,7 +98,7 @@ class Backup:
                 continue
             packing_dir_free_space = get_free_space_in_dir(packdir)
             logger.info("Checking {}: Free space in packing dir: {:.2f}G; Backup size is: {:2f}G."
-                        .format(packdir, packing_dir_free_space/1024/1024/1024, backup_size/1024/1024))
+                        .format(packdir, packing_dir_free_space/1024/1024/1024, backup_size/1024/1024/1024))
             if packing_dir_free_space > backup_size * 2 + 1 * 1024 * 1024 * 1024:
                 logger.info("{} seems suitable for packing.".format(packdir))
                 return packdir

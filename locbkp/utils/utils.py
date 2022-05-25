@@ -135,11 +135,7 @@ def progress_bar(current, total):
 
 
 def get_dir_size_mb(path):
-    size = 0
-    for path, dirs, files in os.walk(path):
-        for f in files:
-            fp = os.path.join(path, f)
-            size += os.path.getsize(fp)
+    size = get_dir_size(path)
     return size / 1024 / 1024
 
 
@@ -232,6 +228,17 @@ def get_free_space_in_dir(path):
             "Can only determine free space associated with directories, "
             "not files.")
     return shutil.disk_usage(path).free
+
+
+def get_dir_size(folder):
+    total_size = os.path.getsize(folder)
+    for item in os.listdir(folder):
+        itempath = os.path.join(folder, item)
+        if os.path.isfile(itempath):
+            total_size += os.path.getsize(itempath)
+        elif os.path.isdir(itempath):
+            total_size += get_dir_size(itempath)
+    return total_size
 
 
 def get_config(cfg_path):

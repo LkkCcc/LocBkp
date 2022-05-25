@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='LocBkp',
-    version='0.0.6a',
+    version='0.0.6b',
     packages=['locbkp', 'locbkp.utils'],
     url='https://github.com/LkkCcc/LocBkp',
     scripts=['locbkp/locbkp'],
